@@ -746,24 +746,27 @@ func (engine *Engine) Use(middleware ...app.HandlerFunc) IRoutes {
 
 // LoadHTMLGlob loads HTML files identified by glob pattern
 // and associates the result with HTML renderer.
-func (engine *Engine) LoadHTMLGlob(pattern string) {
+func (engine *Engine) LoadHTMLGlob(pattern string, reloadCh chan struct{}) {
 	left := engine.delims.Left
 	right := engine.delims.Right
 	templ := template.Must(template.New("").Delims(left, right).Funcs(engine.funcMap).ParseGlob(pattern))
+	releadFunc := func() *template.Template {
+		return template.Must(template.New("").Delims(left, right).Funcs(engine.funcMap).ParseGlob(pattern))
+	}
 
-	engine.SetHTMLTemplate(templ)
+	engine.SetHTMLTemplate(templ, reloadCh, releadFunc)
 }
 
 // LoadHTMLFiles loads a slice of HTML files
 // and associates the result with HTML renderer.
 func (engine *Engine) LoadHTMLFiles(files ...string) {
 	templ := template.Must(template.New("").Delims(engine.delims.Left, engine.delims.Right).Funcs(engine.funcMap).ParseFiles(files...))
-	engine.SetHTMLTemplate(templ)
+	engine.SetHTMLTemplate(templ, nil, nil)
 }
 
 // SetHTMLTemplate associate a template with HTML renderer.
-func (engine *Engine) SetHTMLTemplate(templ *template.Template) {
-	engine.htmlRender = render.HTMLProduction{Template: templ.Funcs(engine.funcMap)}
+func (engine *Engine) SetHTMLTemplate(templ *template.Template, reloadCh chan struct{}, reloadFunc func() *template.Template) {
+	engine.htmlRender = &render.HTMLProduction{Template: templ.Funcs(engine.funcMap), ReloadCh: reloadCh, ReloadFunc: reloadFunc}
 }
 
 // SetFuncMap sets the funcMap used for template.funcMap.

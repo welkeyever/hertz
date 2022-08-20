@@ -44,6 +44,8 @@ package render
 import (
 	"html/template"
 
+	"github.com/cloudwego/hertz/pkg/common/hlog"
+
 	"github.com/cloudwego/hertz/pkg/protocol"
 )
 
@@ -63,8 +65,10 @@ type HTMLRender interface {
 
 // HTMLProduction contains template reference and its delims.
 type HTMLProduction struct {
-	Template *template.Template
-	Delims   Delims
+	Template   *template.Template
+	Delims     Delims
+	ReloadCh   chan struct{}
+	ReloadFunc func() *template.Template
 }
 
 // HTML contains template reference and its name with given interface object.
@@ -77,8 +81,14 @@ type HTML struct {
 var htmlContentType = "text/html; charset=utf-8"
 
 // Instance (HTMLProduction) returns an HTML instance which it realizes Render interface.
-func (r HTMLProduction) Instance(name string, data interface{}) Render {
-	return HTML{
+func (r *HTMLProduction) Instance(name string, data interface{}) Render {
+	select {
+	case <-r.ReloadCh:
+		hlog.Info("reload html template")
+		r.Template = r.ReloadFunc()
+	default:
+	}
+	return &HTML{
 		Template: r.Template,
 		Name:     name,
 		Data:     data,
@@ -86,7 +96,7 @@ func (r HTMLProduction) Instance(name string, data interface{}) Render {
 }
 
 // Render (HTML) executes template and writes its result with custom ContentType for response.
-func (r HTML) Render(resp *protocol.Response) error {
+func (r *HTML) Render(resp *protocol.Response) error {
 	r.WriteContentType(resp)
 
 	if r.Name == "" {
@@ -96,6 +106,6 @@ func (r HTML) Render(resp *protocol.Response) error {
 }
 
 // WriteContentType (HTML) writes HTML ContentType.
-func (r HTML) WriteContentType(resp *protocol.Response) {
+func (r *HTML) WriteContentType(resp *protocol.Response) {
 	writeContentType(resp, htmlContentType)
 }
