@@ -391,7 +391,7 @@ func TestClientReadTimeout(t *testing.T) {
 	c := &http1.HostClient{
 		ClientOptions: &http1.ClientOptions{
 			ReadTimeout: time.Second * 4,
-			RetryConfig: &retry.Config{MaxRetryTimes: 1},
+			RetryConfig: &retry.Config{MaxAttemptTimes: 1},
 			Dialer:      standard.NewDialer(),
 			Addr:        opt.Addr,
 		},
@@ -435,7 +435,7 @@ func TestClientReadTimeout(t *testing.T) {
 	case <-done:
 		// It is abnormal when waiting time exceeds the value of readTimeout times the number of retries.
 		// Give it extra 2 seconds just to be sure.
-	case <-time.After(c.ReadTimeout*time.Duration(c.RetryConfig.MaxRetryTimes) + time.Second*2):
+	case <-time.After(c.ReadTimeout*time.Duration(c.RetryConfig.MaxAttemptTimes) + time.Second*2):
 		t.Fatal("Client.ReadTimeout didn't work")
 	}
 }
@@ -1895,7 +1895,7 @@ func TestClientRetry(t *testing.T) {
 	client, err := NewClient(
 		WithDialTimeout(2*time.Second),
 		WithRetryConfig(
-			retry.WithMaxRetryTimes(3),
+			retry.WithMaxAttemptTimes(3),
 			retry.WithInitDelay(100*time.Millisecond),
 			retry.WithMaxDelay(10*time.Second),
 			retry.WithDelayPolicy(retry.CombineDelay(retry.FixedDelay, retry.BackOffDelay)),
@@ -1924,9 +1924,9 @@ func TestClientRetry(t *testing.T) {
 	client2, err := NewClient(
 		WithDialTimeout(2*time.Second),
 		WithRetryConfig(
-			retry.WithMaxRetryTimes(2),
-			retry.WithInitDelay(1*time.Second),
-			retry.WithMaxJitter(5*time.Second),
+			retry.WithMaxAttemptTimes(2),
+			retry.WithInitDelay(500*time.Millisecond),
+			retry.WithMaxJitter(1*time.Second),
 			retry.WithDelayPolicy(retry.CombineDelay(retry.FixedDelay, retry.RandomDelay)),
 		),
 	)
@@ -1940,8 +1940,8 @@ func TestClientRetry(t *testing.T) {
 	startTime = time.Now().UnixNano()
 	_, resp, err = client2.Get(context.Background(), nil, "http://127.0.0.1:1234/ping")
 	if err != nil {
-		// delay 1+rand([0,5))s
-		if time.Duration(time.Now().UnixNano()-startTime) > 1*time.Second && time.Duration(time.Now().UnixNano()-startTime) < 7*time.Second {
+		// delay 500ms+rand([0,1))s
+		if time.Duration(time.Now().UnixNano()-startTime) > 500*time.Millisecond && time.Duration(time.Now().UnixNano()-startTime) < 2500*time.Millisecond {
 			t.Logf("Retry triggered : resp=%v\terr=%v\n", string(resp), fmt.Sprintln(err))
 		} else if time.Duration(time.Now().UnixNano()-startTime) < 1*time.Second { // Compatible without triggering retry
 			t.Logf("Retry not triggered : resp=%v\terr=%v\n", string(resp), fmt.Sprintln(err))
@@ -1953,10 +1953,10 @@ func TestClientRetry(t *testing.T) {
 	client3, err := NewClient(
 		WithDialTimeout(2*time.Second),
 		WithRetryConfig(
-			retry.WithMaxRetryTimes(2),
-			retry.WithInitDelay(1*time.Second),
-			retry.WithMaxDelay(10*time.Second),
-			retry.WithMaxJitter(5*time.Second),
+			retry.WithMaxAttemptTimes(2),
+			retry.WithInitDelay(100*time.Millisecond),
+			retry.WithMaxDelay(5*time.Second),
+			retry.WithMaxJitter(1*time.Second),
 			retry.WithDelayPolicy(retry.CombineDelay(retry.FixedDelay, retry.BackOffDelay, retry.RandomDelay)),
 		),
 	)
@@ -1970,8 +1970,8 @@ func TestClientRetry(t *testing.T) {
 	startTime = time.Now().UnixNano()
 	_, resp, err = client3.Get(context.Background(), nil, "http://127.0.0.1:1234/ping")
 	if err != nil {
-		// delay 1+2+rand([0,5))s
-		if time.Duration(time.Now().UnixNano()-startTime) > 3*time.Second && time.Duration(time.Now().UnixNano()-startTime) < 9*time.Second {
+		// delay 100ms+200ms+rand([0,1))s
+		if time.Duration(time.Now().UnixNano()-startTime) > 300*time.Millisecond && time.Duration(time.Now().UnixNano()-startTime) < 2300*time.Millisecond {
 			t.Logf("Retry triggered : resp=%v\terr=%v\n", string(resp), fmt.Sprintln(err))
 		} else if time.Duration(time.Now().UnixNano()-startTime) < 1*time.Second { // Compatible without triggering retry
 			t.Logf("Retry not triggered : resp=%v\terr=%v\n", string(resp), fmt.Sprintln(err))
@@ -1983,7 +1983,7 @@ func TestClientRetry(t *testing.T) {
 	client4, err := NewClient(
 		WithDialTimeout(2*time.Second),
 		WithRetryConfig(
-			retry.WithMaxRetryTimes(3),
+			retry.WithMaxAttemptTimes(2),
 			retry.WithInitDelay(1*time.Second),
 			retry.WithMaxDelay(10*time.Second),
 			retry.WithMaxJitter(5*time.Second),
@@ -1995,7 +1995,7 @@ func TestClientRetry(t *testing.T) {
 		return
 	}
 	/* If the retryIfFunc is not set , idempotent logic is used by default */
-	//client3.SetRetryIfFunc(func(req *protocol.Request, resp *protocol.Response, err error) bool {
+	//client4.SetRetryIfFunc(func(req *protocol.Request, resp *protocol.Response, err error) bool {
 	//	return err != nil
 	//})
 	startTime = time.Now().UnixNano()

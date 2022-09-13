@@ -23,10 +23,10 @@ type Option struct {
 	F func(o *Config)
 }
 
-// WithMaxRetryTimes set MaxRetryTimes.
-func WithMaxRetryTimes(maxRetryTimes uint) Option {
+// WithMaxAttemptTimes set WithMaxAttemptTimes , including the first call.
+func WithMaxAttemptTimes(maxAttemptTimes uint) Option {
 	return Option{F: func(o *Config) {
-		o.MaxRetryTimes = maxRetryTimes
+		o.MaxAttemptTimes = maxAttemptTimes
 	}}
 }
 

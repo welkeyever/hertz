@@ -322,7 +322,7 @@ func (c *HostClient) Do(ctx context.Context, req *protocol.Request, resp *protoc
 	)
 	retrycfg := c.ClientOptions.RetryConfig
 	if retrycfg != nil {
-		maxAttempts = retrycfg.MaxRetryTimes
+		maxAttempts = retrycfg.MaxAttemptTimes
 	}
 
 	if c.ClientOptions.RetryIfFunc != nil {
