@@ -19,43 +19,58 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
+	"os"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/app/server"
 	"github.com/cloudwego/hertz/pkg/common/utils"
-	"github.com/cloudwego/hertz/pkg/protocol/consts"
+
+	"github.com/pedia/endless"
 )
 
-type Test struct {
-	A string
-	B string
+func serve_http(addr string, ln net.Listener) *server.Hertz {
+	h := server.New()
+	if ext, err := h.TransporterExt(); err == nil {
+		ext.SetListener(ln)
+	}
+	h.GET("/ping", func(c context.Context, ctx *app.RequestContext) {
+		ctx.JSON(200, utils.H{"message": "pong"})
+	})
+
+	go h.Spin()
+
+	return h
 }
 
 func main() {
-	h := server.Default()
-	h.StaticFS("/", &app.FS{Root: "./", GenerateIndexPages: true})
+	addr := ":3030"
+	var s *server.Hertz
 
-	h.GET("/ping", func(c context.Context, ctx *app.RequestContext) {
-		ctx.JSON(consts.StatusOK, utils.H{"ping": "pong"})
-	})
+	endless.Start(
+		func(p *endless.Parent) error {
+			ln, err := net.Listen("tcp", addr)
+			if err != nil {
+				return err
+			}
 
-	h.GET("/json", func(c context.Context, ctx *app.RequestContext) {
-		ctx.JSON(consts.StatusOK, &Test{
-			A: "aaa",
-			B: "bbb",
-		})
-	})
+			p.AddListener(ln, addr)
+			s = serve_http(addr, ln)
+			return err
+		}, func(c *endless.Child) error {
+			nf, ok := c.NamedFiles[addr]
+			fmt.Printf("got %#v\n", nf)
+			if !ok {
+				return fmt.Errorf("inherit %s not found", addr)
+			}
 
-	h.GET("/redirect", func(c context.Context, ctx *app.RequestContext) {
-		ctx.Redirect(consts.StatusMovedPermanently, []byte("http://www.google.com/"))
-	})
-
-	v1 := h.Group("/v1")
-	{
-		v1.GET("/hello/:name", func(c context.Context, ctx *app.RequestContext) {
-			fmt.Fprintf(ctx, "Hi %s, this is the response from Hertz.\n", ctx.Param("name"))
-		})
-	}
-
-	h.Spin()
+			c.AddListener(nf.Listener, addr)
+			s = serve_http(addr, nf.Listener)
+			return nil
+		},
+		func(ctx context.Context) error {
+			return s.Shutdown(context.Background())
+		},
+	)
+	fmt.Printf("Quit %d\n", os.Getpid())
 }
