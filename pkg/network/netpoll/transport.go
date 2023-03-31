@@ -64,10 +64,13 @@ func NewTransporter(options *config.Options) network.Transporter {
 // or the transport shutdowns
 func (t *transporter) ListenAndServe(onReq network.OnData) (err error) {
 	network.UnlinkUdsFile(t.network, t.addr) //nolint:errcheck
-	if t.listenConfig != nil {
-		t.listener, err = t.listenConfig.Listen(context.Background(), t.network, t.addr)
-	} else {
-		t.listener, err = net.Listen(t.network, t.addr)
+
+	if t.listener == nil {
+		if t.listenConfig != nil {
+			t.listener, err = t.listenConfig.Listen(context.Background(), t.network, t.addr)
+		} else {
+			t.listener, err = net.Listen(t.network, t.addr)
+		}
 	}
 
 	if err != nil {
@@ -136,4 +139,12 @@ func (t *transporter) Shutdown(ctx context.Context) error {
 		return nil
 	}
 	return t.eventLoop.Shutdown(ctx)
+}
+
+func (t *transporter) Listener() net.Listener {
+	return t.listener
+}
+
+func (t *transporter) SetListener(l net.Listener) {
+	t.listener = l
 }
